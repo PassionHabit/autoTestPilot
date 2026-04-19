@@ -89,6 +89,24 @@ interface ElectronAPI {
     show: (options: { title: string; body?: string; onClick?: string }) => Promise<void>;
     onClick: (listener: (action: string) => void) => () => void;
   };
+  traffic?: {
+    start: (opts: { url: string; componentTag?: string }) => Promise<{ success: boolean; error?: string }>;
+    stop: () => Promise<{ success: boolean; error?: string }>;
+    status: () => Promise<{ isCapturing: boolean; hasWindow: boolean }>;
+    onCapture: (callback: (data: {
+      id: string;
+      method: string;
+      url: string;
+      requestHeaders?: Record<string, string>;
+      componentTag?: string;
+      capturedAt: string;
+    }) => void) => () => void;
+    onCaptureUpdate: (callback: (data: {
+      id: string;
+      responseStatus?: number;
+      responseHeaders?: Record<string, string>;
+    }) => void) => () => void;
+  };
 }
 
 declare global {

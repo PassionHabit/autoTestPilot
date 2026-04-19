@@ -66,4 +66,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => { ipcRenderer.removeListener('notification:click', listener); };
     },
   },
+  traffic: {
+    start: (opts: { url: string; componentTag?: string }) =>
+      ipcRenderer.invoke('traffic:start', opts),
+    stop: () =>
+      ipcRenderer.invoke('traffic:stop'),
+    status: () =>
+      ipcRenderer.invoke('traffic:status'),
+    onCapture: (callback: (data: unknown) => void) => {
+      const listener = (_event: unknown, data: unknown) => callback(data);
+      ipcRenderer.on('traffic:capture', listener);
+      return () => { ipcRenderer.removeListener('traffic:capture', listener); };
+    },
+    onCaptureUpdate: (callback: (data: unknown) => void) => {
+      const listener = (_event: unknown, data: unknown) => callback(data);
+      ipcRenderer.on('traffic:capture-update', listener);
+      return () => { ipcRenderer.removeListener('traffic:capture-update', listener); };
+    },
+  },
 });

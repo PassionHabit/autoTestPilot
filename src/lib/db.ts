@@ -3,7 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
-import type { ChatSession, Message, SettingsMap, TaskItem, TaskStatus, ApiProvider, CreateProviderRequest, UpdateProviderRequest, MediaJob, MediaJobStatus, MediaJobItem, MediaJobItemStatus, MediaContextEvent, BatchConfig, CustomCliTool, ScheduledTask } from '@/types';
+import type { ChatSession, Message, SettingsMap, TaskItem, TaskStatus, ApiProvider, CreateProviderRequest, UpdateProviderRequest, MediaJob, MediaJobStatus, MediaJobItem, MediaJobItemStatus, MediaContextEvent, BatchConfig, CustomCliTool, ScheduledTask, CapturedRequest } from '@/types';
 import type { ChannelType, ChannelBinding } from './bridge/types';
 import { getLocalDateString, localDayStartAsUTC } from './utils';
 
@@ -921,6 +921,25 @@ function migrateDb(db: Database.Database): void {
       FOREIGN KEY (task_id) REFERENCES scheduled_tasks(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_task_run_logs_task_id ON task_run_logs(task_id);
+  `);
+
+  // API test / traffic capture
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS captured_requests (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      method TEXT NOT NULL,
+      url TEXT NOT NULL,
+      request_headers TEXT,
+      request_body TEXT,
+      response_status INTEGER,
+      response_headers TEXT,
+      response_body TEXT,
+      component_tag TEXT,
+      captured_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_captured_requests_session_id ON captured_requests(session_id);
+    CREATE INDEX IF NOT EXISTS idx_captured_requests_component_tag ON captured_requests(component_tag);
   `);
 }
 
@@ -2789,6 +2808,72 @@ export function deleteScheduledTask(id: string): boolean {
   const db = getDb();
   const result = db.prepare('DELETE FROM scheduled_tasks WHERE id = ?').run(id);
   return result.changes > 0;
+}
+
+// ==========================================
+// Traffic Capture / API Test
+// ==========================================
+
+export interface CreateCapturedRequestParams {
+  id: string;
+  session_id: string;
+  method: string;
+  url: string;
+  request_headers?: string;
+  request_body?: string;
+  response_status?: number;
+  response_headers?: string;
+  response_body?: string;
+  component_tag?: string;
+}
+
+export function createCapturedRequest(params: CreateCapturedRequestParams): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO captured_requests (id, session_id, method, url, request_headers, request_body, response_status, response_headers, response_body, component_tag)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    params.id,
+    params.session_id,
+    params.method,
+    params.url,
+    params.request_headers ?? null,
+    params.request_body ?? null,
+    params.response_status ?? null,
+    params.response_headers ?? null,
+    params.response_body ?? null,
+    params.component_tag ?? null,
+  );
+}
+
+export function getCapturedRequests(sessionId?: string, componentTag?: string): CapturedRequest[] {
+  const db = getDb();
+  let query = 'SELECT * FROM captured_requests WHERE 1=1';
+  const bindings: string[] = [];
+
+  if (sessionId) {
+    query += ' AND session_id = ?';
+    bindings.push(sessionId);
+  }
+  if (componentTag) {
+    query += ' AND component_tag = ?';
+    bindings.push(componentTag);
+  }
+  query += ' ORDER BY captured_at DESC';
+
+  return db.prepare(query).all(...bindings) as CapturedRequest[];
+}
+
+export function deleteCapturedRequest(id: string): boolean {
+  const db = getDb();
+  const result = db.prepare('DELETE FROM captured_requests WHERE id = ?').run(id);
+  return result.changes > 0;
+}
+
+export function deleteCapturedRequestsBySession(sessionId: string): number {
+  const db = getDb();
+  const result = db.prepare('DELETE FROM captured_requests WHERE session_id = ?').run(sessionId);
+  return result.changes;
 }
 
 export function closeDb(): void {

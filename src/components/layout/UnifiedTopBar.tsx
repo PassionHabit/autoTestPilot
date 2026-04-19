@@ -9,6 +9,7 @@ import {
   DotOutline,
   ChartBar,
   Brain,
+  Lightning,
 } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,8 @@ export function UnifiedTopBar() {
     setDashboardPanelOpen,
     assistantPanelOpen,
     setAssistantPanelOpen,
+    trafficPanelOpen,
+    setTrafficPanelOpen,
     isAssistantWorkspace,
     currentBranch,
     gitDirtyCount,
@@ -230,6 +233,21 @@ export function UnifiedTopBar() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">{t('topBar.git')}</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={trafficPanelOpen ? "secondary" : "ghost"}
+                    size="icon-sm"
+                    className={trafficPanelOpen ? "" : "text-muted-foreground hover:text-foreground"}
+                    onClick={() => setTrafficPanelOpen(!trafficPanelOpen)}
+                  >
+                    <Lightning size={16} />
+                    <span className="sr-only">{t('topBar.apiTest')}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{t('topBar.apiTest')}</TooltipContent>
               </Tooltip>
 
               <Tooltip>

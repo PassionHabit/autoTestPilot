@@ -26,6 +26,20 @@ export interface ChatSession {
   context_summary_updated_at?: string;
 }
 
+export interface CapturedRequest {
+  id: string;
+  session_id: string;
+  method: string;
+  url: string;
+  request_headers?: string;
+  request_body?: string;
+  response_status?: number;
+  response_headers?: string;
+  response_body?: string;
+  component_tag?: string;
+  captured_at: string;
+}
+
 // ==========================================
 // Project / File Types
 // ==========================================

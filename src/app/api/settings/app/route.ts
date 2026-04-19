@@ -20,6 +20,8 @@ const ALLOWED_KEYS = [
   'cli_enabled',
   // Feature announcement dismiss flags (persist across Electron restarts)
   'codepilot:announcement:v0.48-agent-engine',
+  // API test / traffic capture
+  'api_test_enabled',
 ];
 
 export async function GET() {

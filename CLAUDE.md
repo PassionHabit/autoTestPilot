@@ -1,8 +1,40 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 CodePilot — 多模型 AI Agent 桌面客户端，基于 Electron + Next.js。
 
 > 架构细节见 [ARCHITECTURE.md](./ARCHITECTURE.md)，本文件只包含规则和流程。
+
+## 项目结构
+
+```
+apps/           # 子应用（site 等）
+packages/       # 共享包
+src/            # Next.js 前端 + API + 核心业务
+electron/       # Electron 主进程 + preload
+```
+
+## 常用命令
+
+```bash
+npm run dev              # Next.js 开发服务器 (http://localhost:3000)
+npm run electron:dev     # 完整 Electron 开发环境
+npm run build            # 生产构建
+npm run electron:pack:mac/win/linux   # 打包分发
+
+npm run typecheck        # TypeScript 类型检查
+npm run lint             # ESLint 检查
+npm run lint:colors      # 检查未规范化的 Tailwind 颜色类名
+
+# 测试
+npm run test:unit src/__tests__/unit/specific.test.ts   # 单个单元测试文件
+npm run test            # typecheck + 单元测试 (~4s)
+npm run test:smoke      # 冒烟测试 (~15s，需要 dev server)
+npm run test:e2e        # 完整 E2E (~60s+，需要 dev server)
+```
+
+**数据库位置：** 开发模式 `./data/codepilot.db`，生产模式 `~/.codepilot/codepilot.db`
 
 ## 开发规则
 
@@ -39,16 +71,6 @@ CodePilot — 多模型 AI Agent 桌面客户端，基于 Electron + Next.js。
 - 标题行使用 conventional commits 格式（feat/fix/refactor/chore 等）
 - body 中按文件或功能分组，说明改了什么、为什么改、影响范围
 - 修复 bug 需说明根因；架构决策需简要说明理由
-
-## 自检命令
-
-**自检命令（pre-commit hook 会自动执行前三项）：**
-- `npm run test` — typecheck + 单元测试（~4s，无需 dev server）
-- `npm run test:smoke` — 冒烟测试（~15s，需要 dev server）
-- `npm run test:e2e` — 完整 E2E（~60s+，需要 dev server）
-
-修改代码后，commit 前至少确保 `npm run test` 通过。
-涉及 UI 改动时额外运行 `npm run test:smoke`。
 
 ## 改动自查
 

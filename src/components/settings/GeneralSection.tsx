@@ -128,6 +128,8 @@ export function GeneralSection() {
   const [skipPermSaving, setSkipPermSaving] = useState(false);
   const [generativeUI, setGenerativeUI] = useState(true);
   const [generativeUISaving, setGenerativeUISaving] = useState(false);
+  const [apiTestEnabled, setApiTestEnabled] = useState(false);
+  const [apiTestSaving, setApiTestSaving] = useState(false);
   const [defaultPanel, setDefaultPanel] = useState('file_tree');
   const { accountInfo } = useAccountInfo();
   const { t, locale, setLocale } = useTranslation();
@@ -141,6 +143,8 @@ export function GeneralSection() {
         setSkipPermissions(appSettings.dangerously_skip_permissions === "true");
         // generative_ui_enabled defaults to true when not set
         setGenerativeUI(appSettings.generative_ui_enabled !== "false");
+        // api_test_enabled defaults to false when not set
+        setApiTestEnabled(appSettings.api_test_enabled === "true");
         // default_panel defaults to 'file_tree' when not set
         setDefaultPanel(appSettings.default_panel || 'file_tree');
       }
@@ -215,6 +219,26 @@ export function GeneralSection() {
     }
   };
 
+  const handleApiTestToggle = async (checked: boolean) => {
+    setApiTestSaving(true);
+    try {
+      const res = await fetch("/api/settings/app", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          settings: { api_test_enabled: checked ? "true" : "" },
+        }),
+      });
+      if (res.ok) {
+        setApiTestEnabled(checked);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setApiTestSaving(false);
+    }
+  };
+
   return (
     <div className="max-w-3xl space-y-6">
       <UpdateCard />
@@ -249,6 +273,19 @@ export function GeneralSection() {
             checked={generativeUI}
             onCheckedChange={handleGenerativeUIToggle}
             disabled={generativeUISaving}
+          />
+        </FieldRow>
+
+        {/* API Test toggle */}
+        <FieldRow
+          label={t('settings.apiTestTitle')}
+          description={t('settings.apiTestDesc')}
+          separator
+        >
+          <Switch
+            checked={apiTestEnabled}
+            onCheckedChange={handleApiTestToggle}
+            disabled={apiTestSaving}
           />
         </FieldRow>
 

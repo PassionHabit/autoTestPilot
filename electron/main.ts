@@ -57,6 +57,11 @@ let isQuitting = false;
 let tray: Tray | null = null;
 let bgNotifyTimer: ReturnType<typeof setInterval> | null = null;
 
+// Traffic capture window (hidden BrowserWindow for HTTP interception)
+let trafficCaptureWindow: BrowserWindow | null = null;
+let trafficCaptureSession: Electron.Session | null = null;
+let isTrafficCapturing = false;
+
 // --- Install orchestrator ---
 interface InstallStep {
   id: string;
@@ -1471,6 +1476,134 @@ app.whenReady().then(async () => {
     } catch {
       return 'DIRECT';
     }
+  });
+
+  // Traffic capture IPC — creates a hidden BrowserWindow and intercepts HTTP requests
+  ipcMain.handle('traffic:start', async (_event, { url, componentTag }: { url: string; componentTag?: string }) => {
+    try {
+      if (trafficCaptureWindow && !trafficCaptureWindow.isDestroyed()) {
+        trafficCaptureWindow.destroy();
+      }
+
+      // Create isolated session for traffic capture
+      trafficCaptureSession = session.fromPartition(`traffic-capture-${Date.now()}`);
+
+      // Set up webRequest interception
+      const capturedRequests: Array<{
+        id: string;
+        method: string;
+        url: string;
+        requestHeaders: string;
+        requestBody?: string;
+        responseStatus?: number;
+        responseHeaders?: string;
+        componentTag?: string;
+        capturedAt: string;
+      }> = [];
+
+      trafficCaptureSession.webRequest.onBeforeRequest(async (details, callback) => {
+        // Filter for XHR/Fetch requests
+        const contentType = details.requestHeaders['Content-Type'] || '';
+        const isAjax = contentType.includes('application/json') ||
+          contentType.includes('application/x-www-form-urlencoded') ||
+          contentType.includes('multipart/form-data') ||
+          details.url.includes('/api/') ||
+          details.url.includes('/v1/');
+
+        if (isAjax || details.resourceType === 'xhr' || details.resourceType === 'fetch') {
+          const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+          capturedRequests.push({
+            id: requestId,
+            method: details.method,
+            url: details.url,
+            requestHeaders: JSON.stringify(details.requestHeaders),
+            requestBody: details.uploadData ? JSON.stringify(details.uploadData) : undefined,
+            componentTag: componentTag || '',
+            capturedAt: new Date().toISOString(),
+          });
+
+          // Send to renderer immediately
+          mainWindow?.webContents.send('traffic:capture', {
+            id: requestId,
+            method: details.method,
+            url: details.url,
+            requestHeaders: details.requestHeaders,
+            componentTag: componentTag || '',
+            capturedAt: new Date().toISOString(),
+          });
+        }
+
+        callback({ cancel: false });
+      });
+
+      trafficCaptureSession.webRequest.onCompleted(async (details) => {
+        // Update response status for matching request
+        const request = capturedRequests.find(r => r.url === details.url);
+        if (request) {
+          request.responseStatus = details.statusCode;
+          request.responseHeaders = JSON.stringify(details.responseHeaders);
+
+          // Send updated info to renderer
+          mainWindow?.webContents.send('traffic:capture-update', {
+            id: request.id,
+            responseStatus: details.statusCode,
+            responseHeaders: details.responseHeaders,
+          });
+        }
+      });
+
+      // Create hidden BrowserWindow with isolated session
+      trafficCaptureWindow = new BrowserWindow({
+        show: false,
+        width: 1280,
+        height: 860,
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false,
+          session: trafficCaptureSession,
+        },
+      });
+
+      // Block window.open in the capture window
+      trafficCaptureWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
+      trafficCaptureWindow.on('closed', () => {
+        trafficCaptureWindow = null;
+        trafficCaptureSession = null;
+        isTrafficCapturing = false;
+      });
+
+      await trafficCaptureWindow.loadURL(url);
+      isTrafficCapturing = true;
+
+      return { success: true };
+    } catch (error) {
+      console.error('[traffic:start] Error:', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('traffic:stop', async () => {
+    try {
+      if (trafficCaptureWindow && !trafficCaptureWindow.isDestroyed()) {
+        trafficCaptureWindow.destroy();
+      }
+      trafficCaptureWindow = null;
+      trafficCaptureSession = null;
+      isTrafficCapturing = false;
+      return { success: true };
+    } catch (error) {
+      console.error('[traffic:stop] Error:', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('traffic:status', async () => {
+    return {
+      isCapturing: isTrafficCapturing,
+      hasWindow: trafficCaptureWindow !== null && !trafficCaptureWindow.isDestroyed(),
+    };
   });
 
   try {

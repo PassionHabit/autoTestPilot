@@ -20,6 +20,8 @@ export interface PanelContextValue {
   setDashboardPanelOpen: (open: boolean) => void;
   assistantPanelOpen: boolean;
   setAssistantPanelOpen: (open: boolean) => void;
+  trafficPanelOpen: boolean;
+  setTrafficPanelOpen: (open: boolean) => void;
   isAssistantWorkspace: boolean;
   setIsAssistantWorkspace: (is: boolean) => void;
 

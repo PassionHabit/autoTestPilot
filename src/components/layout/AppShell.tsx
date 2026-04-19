@@ -25,6 +25,7 @@ import { useGitStatus } from "@/hooks/useGitStatus";
 import { SetupCenter } from '@/components/setup/SetupCenter';
 import { Toaster } from '@/components/ui/toast';
 import { useNotificationPoll } from '@/hooks/useNotificationPoll';
+import { TrafficCapturePanel } from '@/components/chat/TrafficCapturePanel';
 
 const SPLIT_SESSIONS_KEY = "codepilot:split-sessions";
 const SPLIT_ACTIVE_COLUMN_KEY = "codepilot:split-active-column";
@@ -149,6 +150,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       localStorage.setItem("codepilot_chatlist_width", String(w));
       return w;
     });
+  }, []);
+
+  // Traffic capture panel state
+  const [apiTestEnabled, setApiTestEnabled] = useState(false);
+  const [trafficPanelOpen, setTrafficPanelOpen] = useState(false);
+  const [trafficPanelWidth, setTrafficPanelWidth] = useState(320);
+  const TRAFFIC_PANEL_MIN = 280;
+  const TRAFFIC_PANEL_MAX = 500;
+
+  // Fetch api_test_enabled setting
+  useEffect(() => {
+    fetch("/api/settings/app")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.settings?.api_test_enabled === "true") {
+          setApiTestEnabled(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Open traffic panel when api_test_enabled is true (initial open)
+  useEffect(() => {
+    if (apiTestEnabled && !trafficPanelOpen) {
+      setTrafficPanelOpen(true);
+    }
+  }, [apiTestEnabled]);
+
+  const handleTrafficPanelResize = useCallback((delta: number) => {
+    setTrafficPanelWidth((w) => Math.min(TRAFFIC_PANEL_MAX, Math.max(TRAFFIC_PANEL_MIN, w + delta)));
+  }, []);
+
+  const handleTrafficPanelResizeEnd = useCallback(() => {
+    localStorage.setItem("codepilot_traffic_panel_width", String(trafficPanelWidth));
+  }, [trafficPanelWidth]);
+
+  const handleTrafficPanelClose = useCallback(() => {
+    setTrafficPanelOpen(false);
   }, []);
 
   // Panel state — chatListOpen is no longer gated by route (sidebar always visible)
@@ -414,6 +453,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       setDashboardPanelOpen,
       assistantPanelOpen,
       setAssistantPanelOpen,
+      trafficPanelOpen,
+      setTrafficPanelOpen,
       isAssistantWorkspace,
       setIsAssistantWorkspace,
       currentBranch,
@@ -437,7 +478,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       previewViewMode,
       setPreviewViewMode,
     }),
-    [fileTreeOpen, gitPanelOpen, previewOpen, terminalOpen, dashboardPanelOpen, assistantPanelOpen, isAssistantWorkspace, currentBranch, gitDirtyCount, currentWorktreeLabel, workingDirectory, sessionId, sessionTitle, streamingSessionId, pendingApprovalSessionId, activeStreamingSessions, pendingApprovalSessionIds, previewFile, setPreviewFile, previewViewMode]
+    [fileTreeOpen, gitPanelOpen, previewOpen, terminalOpen, dashboardPanelOpen, assistantPanelOpen, trafficPanelOpen, isAssistantWorkspace, currentBranch, gitDirtyCount, currentWorktreeLabel, workingDirectory, sessionId, sessionTitle, streamingSessionId, pendingApprovalSessionId, activeStreamingSessions, pendingApprovalSessionIds, previewFile, setPreviewFile, previewViewMode]
   );
 
   const imageGenValue = useImageGenState();
@@ -462,6 +503,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </ErrorBoundary>
             {chatListOpen && (
               <ResizeHandle side="left" onResize={handleChatListResize} onResizeEnd={handleChatListResizeEnd} />
+            )}
+            {apiTestEnabled && trafficPanelOpen && (
+              <ErrorBoundary>
+                <TrafficCapturePanel
+                  width={trafficPanelWidth}
+                  onResize={handleTrafficPanelResize}
+                  onResizeEnd={handleTrafficPanelResizeEnd}
+                  onClose={handleTrafficPanelClose}
+                />
+              </ErrorBoundary>
+            )}
+            {apiTestEnabled && trafficPanelOpen && (
+              <ResizeHandle side="left" onResize={handleTrafficPanelResize} onResizeEnd={handleTrafficPanelResizeEnd} />
             )}
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               <UnifiedTopBar />
